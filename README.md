@@ -1,6 +1,6 @@
 # Alerta personal de resoluciones para Excel Online
 
-Este paquete contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
+Este paquete actualizado (versión 1.3) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
 
 ## Funcionamiento
 
@@ -11,14 +11,15 @@ Este paquete contiene el complemento web para Excel Online. Lee únicamente las 
 - El botón **Aceptar** cierra la ventana. El interruptor del panel activa o desactiva las alertas.
 - Solo muestra alertas cuando la persona que tiene el complemento cambia F. Las resoluciones y motivos anteriores de otros usuarios sí se usan como antecedentes. El estado de activación se guarda en el almacenamiento local del navegador, no en el libro.
 - El complemento aparece en una pestaña propia llamada **Mis alertas** en la cinta superior de Excel.
+- El panel muestra el resultado de cada cambio local en F: si lo detectó, qué hoja y fila revisó, y si encontró una resolución opuesta. Esto ayuda a distinguir entre un detector sin conexión y una cédula sin contradicción.
 
 ## Publicar en GitHub Pages
 
 1. Sube el contenido de esta carpeta a la raíz del repositorio `bryanalexexevair-lab/alertas-resoluciones`, o a una carpeta que vayas a publicar.
 2. Activa GitHub Pages para esa ubicación. Los archivos del complemento deben quedar disponibles mediante HTTPS.
 3. El manifiesto ya apunta a `https://bryanalexexevair-lab.github.io/alertas-resoluciones/`. Si publicas los archivos en una subcarpeta, actualiza todas las URL del manifiesto para incluirla.
-4. Sube `manifest.xml` en Excel Online con **Inicio > Complementos > Más configuración > Cargar mi complemento**.
-5. Abre el panel, activa las alertas una vez en ese libro y luego puedes cerrar el panel mientras trabajas.
+4. Sube `manifest.xml` en Excel Online con **Inicio > Complementos > Más configuración > Cargar mi complemento**. Esta versión incrementa el manifiesto y agrega una marca de versión a los recursos para evitar que Excel conserve el JavaScript anterior.
+5. Abre el panel, activa las alertas una vez en ese libro y confirma que indique que está lista en la hoja mensual. Luego puedes cerrar el panel mientras trabajas.
 
 GitHub Pages aloja el código estático del panel y de la ventana. El manifiesto solo apunta a esos archivos. Los datos del libro se leen dentro de Excel Online; no se mandan a GitHub ni a un servidor.
 

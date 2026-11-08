@@ -29,6 +29,8 @@
     if (!value) {
       activeSheetId = null;
       setSheetStatus("Alertas pausadas.");
+    } else {
+      setSheetStatus("Conectando el detector de cambios de este libro…");
     }
   }
 
@@ -110,6 +112,7 @@
     if (!enabled || !changeHandlerReady || event.source !== "Local") return;
     const rows = parseStatusRows(event.address);
     if (!rows.length) return;
+    setSheetStatus("Cambio local en " + event.address + "; identificando la hoja…");
     let sheetName = "";
     try {
       sheetName = await getMonthlySheetName(event.worksheetId);
@@ -117,11 +120,19 @@
       setSheetStatus("No pude identificar la hoja modificada: " + safeError(error), "error");
       return;
     }
-    if (!sheetName) return;
+    if (!sheetName) {
+      setSheetStatus("Detecté el cambio, pero esa hoja no tiene nombre mensual o encabezados compatibles.");
+      return;
+    }
     for (const rowNumber of rows) {
       try {
         const alertData = await findConflicts(event.worksheetId, sheetName, rowNumber);
-        if (alertData) await openAlert(alertData);
+        if (alertData) {
+          setSheetStatus("Encontré resoluciones opuestas para " + alertData.id + ". Mostrando alerta.", "ready");
+          await openAlert(alertData);
+        } else {
+          setSheetStatus("Revisé " + sheetName + " · F" + rowNumber + ": no hay resolución opuesta de otro usuario.", "ready");
+        }
       } catch (error) {
         setSheetStatus("No pude revisar la resolución: " + safeError(error), "error");
       }
