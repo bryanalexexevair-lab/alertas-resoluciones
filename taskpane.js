@@ -8,6 +8,7 @@
   let enabled = false;
   let activeSheetId = null;
   let activationHandlerReady = false;
+  let storageKey = STORAGE_KEY;
 
   const toggleButton = () => document.getElementById("toggleButton");
   const setSheetStatus = (message, state) => {
@@ -18,11 +19,11 @@
 
   function setEnabled(value) {
     enabled = value;
-    try { window.localStorage.setItem(STORAGE_KEY, value ? "1" : "0"); } catch (_) { /* Storage can be restricted. */ }
+    try { window.localStorage.setItem(storageKey, value ? "1" : "0"); } catch (_) { /* Storage can be restricted. */ }
     const button = toggleButton();
     button.setAttribute("aria-pressed", value ? "true" : "false");
     document.getElementById("toggleTitle").textContent = value ? "Alertas activadas" : "Alertas desactivadas";
-    document.getElementById("toggleHint").textContent = value ? "Vigilando la hoja mensual mientras este panel permanezca abierto." : "Actívalas para vigilar la hoja mensual.";
+    document.getElementById("toggleHint").textContent = value ? "Se vigila este libro aunque cierres el panel." : "Actívalas una vez en este libro; luego podrás cerrar el panel.";
     document.getElementById("toggleLabel").textContent = value ? "Desactivar" : "Activar";
     button.classList.toggle("on", value);
     if (!value) {
@@ -142,18 +143,19 @@
 
       const lastRow = used.rowIndex + used.rowCount;
       if (lastRow < 2 || rowNumber <= 2) return null;
-      const endPreviousRow = Math.min(lastRow, rowNumber - 1);
-      if (endPreviousRow < 2) return null;
+      if (lastRow < 2) return null;
+      const endDataRow = lastRow;
 
-      const names = sheet.getRange("B2:B" + endPreviousRow);
-      const ids = sheet.getRange("E2:E" + endPreviousRow);
-      const statuses = sheet.getRange("F2:F" + endPreviousRow);
-      const motives = sheet.getRange("G2:G" + endPreviousRow);
+      const names = sheet.getRange("B2:B" + endDataRow);
+      const ids = sheet.getRange("E2:E" + endDataRow);
+      const statuses = sheet.getRange("F2:F" + endDataRow);
+      const motives = sheet.getRange("G2:G" + endDataRow);
       names.load("text"); ids.load("text"); statuses.load("text"); motives.load("text");
       await context.sync();
 
       const conflicts = [];
       for (let i = 0; i < ids.text.length; i += 1) {
+        if (i + 2 === rowNumber) continue;
         if (normalizedId(ids.text[i][0]) !== idKey) continue;
         const priorName = (names.text[i][0] || "").trim();
         if (currentUserKey && normalized(priorName) === currentUserKey) continue;
@@ -235,25 +237,55 @@
     return error && error.message ? error.message : "error desconocido";
   }
 
+  function workbookStorageKey() {
+    const source = String(Office.context.document.url || "current-workbook");
+    let hash = 2166136261;
+    for (let i = 0; i < source.length; i += 1) {
+      hash ^= source.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return STORAGE_KEY + "-" + (hash >>> 0).toString(16);
+  }
+
   Office.onReady(async (info) => {
     if (info.host !== Office.HostType.Excel) {
       setSheetStatus("Este complemento funciona dentro de Excel Online.", "error");
       return;
     }
-    try { enabled = window.localStorage.getItem(STORAGE_KEY) === "1"; } catch (_) { enabled = false; }
+    storageKey = workbookStorageKey();
+    let savedEnabled = false;
+    try { savedEnabled = window.localStorage.getItem(storageKey) === "1"; } catch (_) { savedEnabled = false; }
+    let startupConfigured = false;
+    try {
+      startupConfigured = await Office.addin.getStartupBehavior() === Office.StartupBehavior.load;
+    } catch (_) { startupConfigured = false; }
+    enabled = savedEnabled && startupConfigured;
     setEnabled(enabled);
     document.getElementById("toggleButton").addEventListener("click", async () => {
       if (!enabled) {
         setEnabled(true);
+        try {
+          await Office.addin.setStartupBehavior(Office.StartupBehavior.load);
+          setSheetStatus("Inicio automático activado para este libro. Puedes cerrar el panel.", "ready");
+        } catch (error) {
+          setSheetStatus("No se pudo activar el inicio automático. Deja el panel abierto para recibir alertas. " + safeError(error), "error");
+        }
         await registerActivationHandler();
         await bindActiveMonthlySheet();
       } else {
         setEnabled(false);
+        try {
+          await Office.addin.setStartupBehavior(Office.StartupBehavior.none);
+        } catch (error) {
+          setSheetStatus("Alertas pausadas en esta sesión; no pude cambiar el inicio automático. " + safeError(error), "error");
+        }
       }
     });
     if (enabled) {
       await registerActivationHandler();
       await bindActiveMonthlySheet();
+    } else {
+      setSheetStatus("Activa las alertas en este libro; después podrás cerrar el panel.");
     }
   });
 })();

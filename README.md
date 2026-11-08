@@ -5,11 +5,12 @@ Este paquete contiene una primera versión del complemento web para Excel Online
 ## Funcionamiento
 
 - Detecta la hoja mensual activa por su nombre en español y comprueba sus encabezados en B1, E1, F1 y G1.
-- Al cambiar una celda de F, compara la cédula de E con las filas anteriores de la misma hoja.
-- Solo alerta cuando encuentra la misma cédula con la resolución opuesta (`APLICA` frente a `NO APLICA`) en una fila anterior de otro usuario. No incluye las propias filas anteriores de quien está usando el complemento.
+- Al cambiar una celda de F, compara la cédula de E con el resto de las filas de esa misma hoja.
+- Solo alerta cuando encuentra la misma cédula con la resolución opuesta (`APLICA` frente a `NO APLICA`) en otro usuario. No incluye las propias filas de quien está usando el complemento.
 - Muestra el nombre de B, la resolución y el motivo de G de cada antecedente contradictorio. Si no hay contradicción, no abre una ventana.
 - El botón **Aceptar** cierra la ventana. El interruptor del panel activa o desactiva las alertas.
 - Solo muestra alertas cuando la persona que tiene el complemento cambia F. Las resoluciones y motivos anteriores de otros usuarios sí se usan como antecedentes. El estado de activación se guarda en el almacenamiento local del navegador, no en el libro.
+- El complemento aparece en una pestaña propia llamada **Mis alertas** en la cinta superior de Excel.
 
 ## Publicar en GitHub Pages
 
@@ -23,7 +24,7 @@ GitHub Pages aloja el código estático del panel y de la ventana. El manifiesto
 
 ## Alcance y límites de esta versión
 
-- El panel debe permanecer abierto para escuchar cambios durante la sesión. Excel Online no conserva los manejadores de eventos después de cerrar o recargar el complemento.
+- La primera vez en cada libro, abre el panel desde **Mis alertas** y activa las alertas. El complemento configura un runtime compartido para que siga escuchando cambios aunque cierres el panel y vuelva a iniciarse cuando abras ese libro. Excel Online no conserva los manejadores después de cerrar o recargar el complemento; al abrir el libro de nuevo, el runtime se inicia y registra otra vez.
 - La alerta aparece al confirmar un cambio en F; no impide guardar la resolución. Permite revisarla inmediatamente y cerrar el aviso con **Aceptar**.
 - Las cédulas se comparan sin espacios, guiones ni signos de puntuación, y sin distinguir mayúsculas/minúsculas. Las resoluciones se reconocen tras quitar espacios y normalizar mayúsculas.
 - Se espera encabezado en fila 1 y datos desde fila 2, igual que en la hoja revisada.
