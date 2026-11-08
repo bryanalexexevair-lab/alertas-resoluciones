@@ -54,6 +54,11 @@
 
   async function registerActivationHandler() {
     if (activationHandlerReady) return;
+    setSheetStatus("v1.5: comprobando si Excel admite la detección de cambios…");
+    if (!Office.context.requirements.isSetSupported("ExcelApi", "1.9")) {
+      throw new Error("Esta sesión de Excel no informa compatibilidad con ExcelApi 1.9.");
+    }
+    setSheetStatus("v1.5: esperando respuesta de Excel para conectar el detector…");
     await Excel.run(async (context) => {
       context.workbook.worksheets.onActivated.add(onWorksheetActivated);
       context.workbook.worksheets.onChanged.add(onWorksheetChanged);
@@ -61,6 +66,7 @@
     });
     activationHandlerReady = true;
     changeHandlerReady = true;
+    setSheetStatus("v1.5: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
   }
 
   async function onWorksheetActivated() {
@@ -276,6 +282,25 @@
     return STORAGE_KEY + "-" + (hash >>> 0).toString(16);
   }
 
+  async function connectDetector() {
+    try {
+      await registerActivationHandler();
+      await bindActiveMonthlySheet();
+      return true;
+    } catch (error) {
+      setSheetStatus("No se pudo completar la conexión con Excel: " + safeError(error), "error");
+      return false;
+    }
+  }
+
+  function configureBackground() {
+    Office.addin.setStartupBehavior(Office.StartupBehavior.load).then(() => {
+      setSheetStatus("Detector conectado en " + activeSheetLabel() + ". Segundo plano activado.", "ready");
+    }).catch((error) => {
+      setSheetStatus("Detector conectado en " + activeSheetLabel() + ", pero Excel no activó el segundo plano. Deja abierto el panel. " + safeError(error), "error");
+    });
+  }
+
   Office.onReady(async (info) => {
     if (info.host !== Office.HostType.Excel) {
       setSheetStatus("Este complemento funciona dentro de Excel Online.", "error");
@@ -284,27 +309,12 @@
     storageKey = workbookStorageKey();
     let savedEnabled = false;
     try { savedEnabled = window.localStorage.getItem(storageKey) === "1"; } catch (_) { savedEnabled = false; }
-    let startupConfigured = false;
-    try {
-      startupConfigured = await Office.addin.getStartupBehavior() === Office.StartupBehavior.load;
-    } catch (_) { startupConfigured = false; }
-    enabled = savedEnabled && startupConfigured;
+    enabled = savedEnabled;
     setEnabled(enabled);
     document.getElementById("toggleButton").addEventListener("click", async () => {
       if (!enabled) {
         setEnabled(true);
-        try {
-          await registerActivationHandler();
-          await bindActiveMonthlySheet();
-        } catch (error) {
-          setSheetStatus("No se pudo conectar el detector. Deja abierto el panel y revisa este error: " + safeError(error), "error");
-          return;
-        }
-        Office.addin.setStartupBehavior(Office.StartupBehavior.load).then(() => {
-          setSheetStatus("Detector conectado en " + activeSheetLabel() + ". Puedes cerrar el panel.", "ready");
-        }).catch((error) => {
-          setSheetStatus("Detector conectado en " + activeSheetLabel() + ", pero no se activó el segundo plano. Deja abierto el panel. " + safeError(error), "error");
-        });
+        if (await connectDetector()) configureBackground();
       } else {
         setEnabled(false);
         try {
@@ -315,8 +325,7 @@
       }
     });
     if (enabled) {
-      await registerActivationHandler();
-      await bindActiveMonthlySheet();
+      if (await connectDetector()) configureBackground();
     } else {
       setSheetStatus("Activa las alertas en este libro; después podrás cerrar el panel.");
     }
