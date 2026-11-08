@@ -1,6 +1,6 @@
 # Alerta personal de resoluciones para Excel Online
 
-Este paquete actualizado (versión 1.3) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
+Este paquete actualizado (versión 1.4) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
 
 ## Funcionamiento
 

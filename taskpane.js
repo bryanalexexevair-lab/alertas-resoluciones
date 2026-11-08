@@ -294,13 +294,17 @@
       if (!enabled) {
         setEnabled(true);
         try {
-          await Office.addin.setStartupBehavior(Office.StartupBehavior.load);
-          setSheetStatus("Inicio automático activado para este libro. Puedes cerrar el panel.", "ready");
+          await registerActivationHandler();
+          await bindActiveMonthlySheet();
         } catch (error) {
-          setSheetStatus("No se pudo activar el inicio automático. Deja el panel abierto para recibir alertas. " + safeError(error), "error");
+          setSheetStatus("No se pudo conectar el detector. Deja abierto el panel y revisa este error: " + safeError(error), "error");
+          return;
         }
-        await registerActivationHandler();
-        await bindActiveMonthlySheet();
+        Office.addin.setStartupBehavior(Office.StartupBehavior.load).then(() => {
+          setSheetStatus("Detector conectado en " + activeSheetLabel() + ". Puedes cerrar el panel.", "ready");
+        }).catch((error) => {
+          setSheetStatus("Detector conectado en " + activeSheetLabel() + ", pero no se activó el segundo plano. Deja abierto el panel. " + safeError(error), "error");
+        });
       } else {
         setEnabled(false);
         try {
@@ -317,5 +321,11 @@
       setSheetStatus("Activa las alertas en este libro; después podrás cerrar el panel.");
     }
   });
+
+  function activeSheetLabel() {
+    const status = document.getElementById("sheetStatus").textContent;
+    const match = status.match(/Lista en (.+?)\./);
+    return match ? match[1] : "la hoja activa";
+  }
 })();
 
