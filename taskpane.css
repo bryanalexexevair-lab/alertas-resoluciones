@@ -1,0 +1,26 @@
+:root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; color: #172b4d; background: #f7f9fc; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 280px; }
+.panel { padding: 25px 20px; }
+.brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: #fff; background: #1359c7; font-weight: 700; font-size: 22px; }
+.eyebrow { margin: 22px 0 6px; color: #536b8a; font-size: 10px; letter-spacing: 1.25px; font-weight: 700; }
+h1 { margin: 0; font-size: 22px; line-height: 1.2; }
+.intro { margin: 10px 0 22px; color: #536b8a; font-size: 13px; line-height: 1.5; }
+.toggle-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border: 1px solid #dce4ef; border-radius: 12px; background: #fff; }
+.toggle-card strong { font-size: 13px; }
+.toggle-card p { margin: 4px 0 0; color: #657b96; font-size: 11px; line-height: 1.4; }
+.toggle { display: inline-flex; align-items: center; gap: 7px; flex: none; border: 0; border-radius: 999px; padding: 8px 11px; color: #fff; background: #1459c7; cursor: pointer; font-size: 12px; font-weight: 700; }
+.toggle[aria-pressed="true"] { background: #16734a; }
+.toggle-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sheet-status { margin-top: 14px; padding: 11px 12px; border-radius: 9px; color: #536b8a; background: #edf2f8; font-size: 12px; line-height: 1.45; }
+.sheet-status.ready { color: #155b3d; background: #e7f5ee; }
+.sheet-status.error { color: #8e2b25; background: #fff0ee; }
+.inline-alert { margin-top: 12px; padding: 12px; border: 1px solid #f2c77f; border-radius: 9px; color: #664300; background: #fff8e9; font-size: 12px; line-height: 1.45; }
+.inline-alert p { margin: 0; }
+.inline-accept { margin-top: 9px; border: 0; border-radius: 6px; padding: 7px 12px; color: #fff; background: #1359c7; cursor: pointer; font-size: 11px; font-weight: 700; }
+.inline-alert[hidden] { display: none; }
+.scope { margin-top: 23px; padding-top: 17px; border-top: 1px solid #e0e7f0; }
+.scope h2 { margin: 0 0 7px; font-size: 13px; }
+.scope p, .privacy { margin: 0; color: #657b96; font-size: 11px; line-height: 1.55; }
+.privacy { margin-top: 20px; }
+

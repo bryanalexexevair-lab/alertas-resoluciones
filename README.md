@@ -1,0 +1,31 @@
+# Alerta personal de resoluciones para Excel Online
+
+Este paquete contiene una primera versión del complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de la hoja mensual activa. No escribe en el libro ni envía su contenido a GitHub.
+
+## Funcionamiento
+
+- Detecta la hoja mensual activa por su nombre en español y comprueba sus encabezados en B1, E1, F1 y G1.
+- Al cambiar una celda de F, compara la cédula de E con las filas anteriores de la misma hoja.
+- Solo alerta cuando encuentra la misma cédula con la resolución opuesta (`APLICA` frente a `NO APLICA`) en una fila anterior de otro usuario. No incluye las propias filas anteriores de quien está usando el complemento.
+- Muestra el nombre de B, la resolución y el motivo de G de cada antecedente contradictorio. Si no hay contradicción, no abre una ventana.
+- El botón **Aceptar** cierra la ventana. El interruptor del panel activa o desactiva las alertas.
+- Solo muestra alertas cuando la persona que tiene el complemento cambia F. Las resoluciones y motivos anteriores de otros usuarios sí se usan como antecedentes. El estado de activación se guarda en el almacenamiento local del navegador, no en el libro.
+
+## Publicar en GitHub Pages
+
+1. Sube el contenido de esta carpeta a la raíz del repositorio `bryanalexexevair-lab/alertas-resoluciones`, o a una carpeta que vayas a publicar.
+2. Activa GitHub Pages para esa ubicación. Los archivos del complemento deben quedar disponibles mediante HTTPS.
+3. El manifiesto ya apunta a `https://bryanalexexevair-lab.github.io/alertas-resoluciones/`. Si publicas los archivos en una subcarpeta, actualiza todas las URL del manifiesto para incluirla.
+4. Sube `manifest.xml` en Excel Online con **Inicio > Complementos > Más configuración > Cargar mi complemento**.
+5. Abre el panel, activa las alertas y deja abierto el complemento mientras trabajas en la hoja mensual.
+
+GitHub Pages aloja el código estático del panel y de la ventana. El manifiesto solo apunta a esos archivos. Los datos del libro se leen dentro de Excel Online; no se mandan a GitHub ni a un servidor.
+
+## Alcance y límites de esta versión
+
+- El panel debe permanecer abierto para escuchar cambios durante la sesión. Excel Online no conserva los manejadores de eventos después de cerrar o recargar el complemento.
+- La alerta aparece al confirmar un cambio en F; no impide guardar la resolución. Permite revisarla inmediatamente y cerrar el aviso con **Aceptar**.
+- Las cédulas se comparan sin espacios, guiones ni signos de puntuación, y sin distinguir mayúsculas/minúsculas. Las resoluciones se reconocen tras quitar espacios y normalizar mayúsculas.
+- Se espera encabezado en fila 1 y datos desde fila 2, igual que en la hoja revisada.
+- No se inspeccionan otras hojas ni columnas.
+

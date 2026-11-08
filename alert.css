@@ -1,0 +1,17 @@
+:root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; color: #172b4d; background: #fff; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 300px; }
+.dialog { padding: 25px 25px 20px; }
+.icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: #724800; background: #fff0ce; font-weight: 800; font-size: 20px; }
+.eyebrow { margin: 18px 0 6px; color: #8b5a00; font-size: 10px; letter-spacing: 1.1px; font-weight: 700; }
+h1 { margin: 0; font-size: 22px; }
+.summary { margin: 10px 0 16px; color: #435a75; font-size: 13px; line-height: 1.5; }
+.conflicts { display: grid; gap: 9px; max-height: 245px; overflow: auto; }
+.conflict { padding: 11px 12px; border: 1px solid #f1d4a3; border-left: 4px solid #e5a52d; border-radius: 8px; background: #fffaf0; }
+.conflict-status { color: #7b4e00; font-size: 11px; font-weight: 800; letter-spacing: .3px; }
+.conflict-name { margin-top: 4px; font-size: 13px; font-weight: 700; }
+.conflict-motive { margin-top: 4px; color: #596f88; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.conflict-row { margin-top: 5px; color: #8796a9; font-size: 10px; }
+button { display: block; min-width: 110px; margin: 19px 0 0 auto; border: 0; border-radius: 7px; padding: 10px 17px; color: #fff; background: #1359c7; cursor: pointer; font-size: 13px; font-weight: 700; }
+button:disabled { opacity: .55; cursor: wait; }
+

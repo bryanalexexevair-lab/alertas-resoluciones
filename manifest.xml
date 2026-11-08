@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:type="TaskPaneApp">
+  <Id>1c42d4f4-92b8-4df7-9a59-1dfda9e5d470</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Complemento personal</ProviderName>
+  <DefaultLocale>es-GT</DefaultLocale>
+  <DisplayName DefaultValue="Alerta personal de resoluciones"/>
+  <Description DefaultValue="Advierte sobre resoluciones APLICA y NO APLICA contradictorias para una cédula repetida."/>
+  <IconUrl DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/icon-64.png"/>
+  <SupportUrl DefaultValue="https://github.com/bryanalexexevair-lab/alertas-resoluciones"/>
+  <AppDomains>
+    <AppDomain>https://bryanalexexevair-lab.github.io</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="ExcelApi" MinVersion="1.7"/>
+      <Set Name="DialogApi" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/taskpane.html"/>
+  </DefaultSettings>
+  <Permissions>ReadDocument</Permissions>
+</OfficeApp>
+

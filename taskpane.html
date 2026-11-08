@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Alerta de resoluciones</title>
+  <link rel="stylesheet" href="taskpane.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script defer src="taskpane.js"></script>
+</head>
+<body>
+  <main class="panel">
+    <div class="brand-mark" aria-hidden="true">✓</div>
+    <p class="eyebrow">COMPLEMENTO PERSONAL</p>
+    <h1>Alerta de resoluciones</h1>
+    <p class="intro">Te avisa si una cédula ya tiene una resolución diferente en esta hoja mensual.</p>
+
+    <section class="toggle-card" aria-live="polite">
+      <div>
+        <strong id="toggleTitle">Alertas desactivadas</strong>
+        <p id="toggleHint">Actívalas para vigilar la hoja mensual.</p>
+      </div>
+      <button id="toggleButton" class="toggle" type="button" aria-pressed="false">
+        <span class="toggle-dot"></span>
+        <span id="toggleLabel">Activar</span>
+      </button>
+    </section>
+
+    <div id="sheetStatus" class="sheet-status" role="status">Conecta el complemento con la hoja mensual activa.</div>
+    <div id="inlineAlert" class="inline-alert" role="alert" hidden></div>
+
+    <section class="scope">
+      <h2>Qué revisa</h2>
+      <p><b>B</b> Usuario · <b>E</b> Cédula · <b>F</b> Resolución · <b>G</b> Motivo</p>
+    </section>
+    <p class="privacy">El complemento trabaja dentro de tu sesión de Excel Online y no modifica el libro.</p>
+  </main>
+</body>
+</html>
+
