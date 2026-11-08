@@ -4,7 +4,7 @@
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xsi:type="TaskPaneApp">
   <Id>1c42d4f4-92b8-4df7-9a59-1dfda9e5d470</Id>
-  <Version>1.1.0.0</Version>
+  <Version>1.2.0.0</Version>
   <ProviderName>Complemento personal</ProviderName>
   <DefaultLocale>es-GT</DefaultLocale>
   <DisplayName DefaultValue="Alerta personal de resoluciones"/>
@@ -20,7 +20,7 @@
   </Hosts>
   <Requirements>
     <Sets DefaultMinVersion="1.1">
-      <Set Name="ExcelApi" MinVersion="1.7"/>
+      <Set Name="ExcelApi" MinVersion="1.9"/>
       <Set Name="DialogApi" MinVersion="1.1"/>
       <Set Name="SharedRuntime" MinVersion="1.1"/>
       <Set Name="AddinCommands" MinVersion="1.3"/>

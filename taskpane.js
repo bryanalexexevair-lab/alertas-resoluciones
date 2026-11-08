@@ -4,10 +4,10 @@
 
   const STORAGE_KEY = "resolucion-alertas-enabled-v1";
   const MONTHS = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-  const registeredSheets = new Set();
   let enabled = false;
   let activeSheetId = null;
   let activationHandlerReady = false;
+  let changeHandlerReady = false;
   let storageKey = STORAGE_KEY;
 
   const toggleButton = () => document.getElementById("toggleButton");
@@ -54,9 +54,11 @@
     if (activationHandlerReady) return;
     await Excel.run(async (context) => {
       context.workbook.worksheets.onActivated.add(onWorksheetActivated);
+      context.workbook.worksheets.onChanged.add(onWorksheetChanged);
       await context.sync();
     });
     activationHandlerReady = true;
+    changeHandlerReady = true;
   }
 
   async function onWorksheetActivated() {
@@ -85,11 +87,6 @@
           return;
         }
         activeSheetId = sheet.id;
-        if (!registeredSheets.has(sheet.id)) {
-          sheet.onChanged.add(onWorksheetChanged);
-          await context.sync();
-          registeredSheets.add(sheet.id);
-        }
         setSheetStatus("Lista en " + sheet.name + ". Cambia una resolución en F para revisar antecedentes.", "ready");
       });
     } catch (error) {
@@ -110,12 +107,20 @@
   }
 
   async function onWorksheetChanged(event) {
-    if (!enabled || event.source !== "Local" || event.worksheetId !== activeSheetId) return;
+    if (!enabled || !changeHandlerReady || event.source !== "Local") return;
     const rows = parseStatusRows(event.address);
     if (!rows.length) return;
+    let sheetName = "";
+    try {
+      sheetName = await getMonthlySheetName(event.worksheetId);
+    } catch (error) {
+      setSheetStatus("No pude identificar la hoja modificada: " + safeError(error), "error");
+      return;
+    }
+    if (!sheetName) return;
     for (const rowNumber of rows) {
       try {
-        const alertData = await findConflicts(event.worksheetId, rowNumber);
+        const alertData = await findConflicts(event.worksheetId, sheetName, rowNumber);
         if (alertData) await openAlert(alertData);
       } catch (error) {
         setSheetStatus("No pude revisar la resolución: " + safeError(error), "error");
@@ -123,9 +128,29 @@
     }
   }
 
-  async function findConflicts(sheetId, rowNumber) {
+  async function getMonthlySheetName(sheetId) {
     return Excel.run(async (context) => {
       const sheet = context.workbook.worksheets.getItem(sheetId);
+      sheet.load("name");
+      await context.sync();
+      if (!isMonthlyName(sheet.name)) return "";
+      const headerRanges = ["B1", "E1", "F1", "G1"].map((address) => sheet.getRange(address));
+      headerRanges.forEach((range) => range.load("text"));
+      await context.sync();
+      return isExpectedHeaders(headerRanges.map((range) => range.text[0][0])) ? sheet.name : "";
+    });
+  }
+
+  async function findConflicts(sheetId, sheetName, rowNumber) {
+    return Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getItem(sheetId);
+      sheet.load("name");
+      await context.sync();
+      if (!isMonthlyName(sheet.name) || sheet.name !== sheetName) return null;
+      const headerRanges = ["B1", "E1", "F1", "G1"].map((address) => sheet.getRange(address));
+      headerRanges.forEach((range) => range.load("text"));
+      await context.sync();
+      if (!isExpectedHeaders(headerRanges.map((range) => range.text[0][0]))) return null;
       const currentRanges = ["B", "E", "F", "G"].map((column) => sheet.getRange(column + rowNumber));
       currentRanges.forEach((range) => range.load("text"));
       const used = sheet.getUsedRange(true);
@@ -142,7 +167,6 @@
       if (!idKey || !currentStatus || currentStatus === "OTHER") return null;
 
       const lastRow = used.rowIndex + used.rowCount;
-      if (lastRow < 2 || rowNumber <= 2) return null;
       if (lastRow < 2) return null;
       const endDataRow = lastRow;
 
@@ -170,7 +194,7 @@
       }
       if (!conflicts.length) return null;
       return {
-        sheet: activeSheetName(),
+        sheet: sheetName,
         row: rowNumber,
         id: currentId,
         name: currentName.trim() || "",
@@ -179,12 +203,6 @@
         conflicts: conflicts
       };
     });
-  }
-
-  function activeSheetName() {
-    const status = document.getElementById("sheetStatus").textContent;
-    const match = status.match(/Lista en (.+?)\./);
-    return match ? match[1] : "hoja mensual";
   }
 
   function normalizeResolution(value) {
