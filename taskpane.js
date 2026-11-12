@@ -103,11 +103,20 @@
   }
 
   function parseStatusRows(address) {
+    return parseColumnRows(address, "F");
+  }
+
+  function parseColumnRows(address, targetColumn) {
     const cellAddress = String(address || "").split("!").pop().replace(/'/g, "").replace(/\$/g, "");
-    const match = cellAddress.match(/^F(\d+)(?::F(\d+))?$/i);
+    const match = cellAddress.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i);
     if (!match) return [];
-    const first = Number(match[1]);
-    const last = Number(match[2] || match[1]);
+    const columnNumber = (letters) => letters.toUpperCase().split("").reduce((number, letter) => number * 26 + letter.charCodeAt(0) - 64, 0);
+    const firstColumn = columnNumber(match[1]);
+    const lastColumn = columnNumber(match[3] || match[1]);
+    const wantedColumn = columnNumber(targetColumn);
+    if (wantedColumn < firstColumn || wantedColumn > lastColumn) return [];
+    const first = Number(match[2]);
+    const last = Number(match[4] || match[2]);
     if (first < 2 || last < first || last - first > 500) return [];
     const rows = [];
     for (let row = first; row <= last; row += 1) rows.push(row);
@@ -116,8 +125,9 @@
 
   async function onWorksheetChanged(event) {
     if (!enabled || !changeHandlerReady || event.source !== "Local") return;
-    const rows = parseStatusRows(event.address);
-    if (!rows.length) return;
+    const statusRows = parseStatusRows(event.address);
+    const idRows = parseColumnRows(event.address, "E");
+    if (!statusRows.length && !idRows.length) return;
     setSheetStatus("Cambio local en " + event.address + "; identificando la hoja…");
     let sheetName = "";
     try {
@@ -130,7 +140,15 @@
       setSheetStatus("Detecté el cambio, pero esa hoja no tiene nombre mensual o encabezados compatibles.");
       return;
     }
-    for (const rowNumber of rows) {
+    for (const rowNumber of idRows) {
+      try {
+        const history = await findCedulaHistory(event.worksheetId, sheetName, rowNumber);
+        if (history) await openDuplicateNotice(history);
+      } catch (error) {
+        setSheetStatus("No pude revisar los antecedentes de la cédula: " + safeError(error), "error");
+      }
+    }
+    for (const rowNumber of statusRows) {
       try {
         const alertData = await findConflicts(event.worksheetId, sheetName, rowNumber);
         if (alertData) {
@@ -143,6 +161,110 @@
         setSheetStatus("No pude revisar la resolución: " + safeError(error), "error");
       }
     }
+  }
+
+  async function findCedulaHistory(sheetId, sheetName, rowNumber) {
+    return Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getItem(sheetId);
+      sheet.load("name");
+      await context.sync();
+      if (!isMonthlyName(sheet.name) || sheet.name !== sheetName) return null;
+      const headerRanges = ["B1", "E1", "F1", "G1"].map((address) => sheet.getRange(address));
+      headerRanges.forEach((range) => range.load("text"));
+      await context.sync();
+      if (!isExpectedHeaders(headerRanges.map((range) => range.text[0][0]))) return null;
+
+      const currentNameRange = sheet.getRange("B" + rowNumber);
+      const currentIdRange = sheet.getRange("E" + rowNumber);
+      currentNameRange.load("text");
+      currentIdRange.load("text");
+      const used = sheet.getUsedRange(true);
+      used.load("rowIndex,rowCount");
+      await context.sync();
+      const currentId = currentIdRange.text[0][0] || "";
+      const idKey = normalizedId(currentId);
+      if (!idKey) return null;
+
+      const lastRow = used.rowIndex + used.rowCount;
+      if (lastRow < 2) return null;
+      const names = sheet.getRange("B2:B" + lastRow);
+      const ids = sheet.getRange("E2:E" + lastRow);
+      const statuses = sheet.getRange("F2:F" + lastRow);
+      names.load("text");
+      ids.load("text");
+      statuses.load("text");
+      await context.sync();
+
+      const currentUserKey = normalized(currentNameRange.text[0][0]);
+      const ownHistory = [];
+      const otherUsers = new Set();
+      let duplicateCount = 0;
+      for (let i = 0; i < ids.text.length; i += 1) {
+        const matchedRow = i + 2;
+        if (matchedRow === rowNumber || normalizedId(ids.text[i][0]) !== idKey) continue;
+        duplicateCount += 1;
+        const priorName = String(names.text[i][0] || "").trim();
+        if (currentUserKey && normalized(priorName) === currentUserKey) {
+          ownHistory.push(normalizeResolution(statuses.text[i][0]));
+        } else if (priorName) {
+          otherUsers.add(priorName);
+        }
+      }
+      if (!duplicateCount) return null;
+
+      const historyMessage = otherUsers.size
+        ? "Esta cédula tiene antecedentes con otros usuarios y contigo."
+        : "Esta cédula solo tiene antecedentes contigo.";
+      const applyCount = ownHistory.filter((status) => status === "APLICA").length;
+      const noApplyCount = ownHistory.filter((status) => status === "NO APLICA").length;
+      const ownCountText = "Tus antecedentes: " + applyCount + " APLICA · " + noApplyCount + " NO APLICA.";
+
+      sheet.getRange("E" + rowNumber).select();
+      await context.sync();
+      return {
+        sheet: sheetName,
+        row: rowNumber,
+        id: String(currentId).trim(),
+        message: historyMessage,
+        detail: otherUsers.size ? "" : ownCountText
+      };
+    });
+  }
+
+  function openDuplicateNotice(data) {
+    return new Promise((resolve) => {
+      const url = new URL("duplicate.html", window.location.href).href;
+      Office.context.ui.displayDialogAsync(url, { height: 28, width: 34, displayInIframe: true }, (result) => {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          showInlineDuplicateNotice(data, resolve);
+          return;
+        }
+        const dialog = result.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (message) => {
+          if (message.message === "READY") {
+            dialog.messageChild(JSON.stringify(data), { targetOrigin: window.location.origin });
+          } else if (message.message === "ACCEPT") {
+            dialog.close();
+            resolve();
+          }
+        });
+        dialog.addEventHandler(Office.EventType.DialogEventReceived, () => resolve());
+      });
+    });
+  }
+
+  function showInlineDuplicateNotice(data, resolve) {
+    const box = document.getElementById("inlineDuplicateNotice");
+    box.replaceChildren();
+    const message = document.createElement("p");
+    message.textContent = data.message + (data.detail ? " " + data.detail : "");
+    const accept = document.createElement("button");
+    accept.type = "button";
+    accept.className = "inline-accept";
+    accept.textContent = "Aceptar";
+    accept.addEventListener("click", () => { box.hidden = true; resolve(); });
+    box.append(message, accept);
+    box.hidden = false;
   }
 
   async function getMonthlySheetName(sheetId) {

@@ -1,0 +1,8 @@
+:root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; color: #172b4d; background: #fff; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 280px; }
+.notice { padding: 15px 18px 12px; }
+#message { margin: 0; font-size: 13px; line-height: 1.45; }
+.detail { margin: 6px 0 0; color: #61758e; font-size: 11px; line-height: 1.4; }
+button { display: block; margin: 12px 0 0 auto; border: 0; border-radius: 5px; padding: 5px 13px; color: #fff; background: #1769aa; cursor: pointer; font: 600 11px "Segoe UI", Arial, sans-serif; }
+button:disabled { opacity: .55; cursor: wait; }
