@@ -4,7 +4,7 @@
            xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
            xsi:type="TaskPaneApp">
   <Id>1c42d4f4-92b8-4df7-9a59-1dfda9e5d470</Id>
-  <Version>1.6.0.0</Version>
+  <Version>1.7.0.0</Version>
   <ProviderName>Complemento personal</ProviderName>
   <DefaultLocale>es-GT</DefaultLocale>
   <DisplayName DefaultValue="Alerta personal de resoluciones"/>
@@ -27,7 +27,7 @@
     </Sets>
   </Requirements>
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/taskpane.html?v=1.6.0"/>
+    <SourceLocation DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/taskpane.html?v=1.7.0"/>
   </DefaultSettings>
   <Permissions>ReadDocument</Permissions>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
@@ -80,7 +80,7 @@
         <bt:Image id="Icon.80" DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/icon-64.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/taskpane.html?v=1.6.0"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/taskpane.html?v=1.7.0"/>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://bryanalexexevair-lab.github.io/alertas-resoluciones/"/>
       </bt:Urls>
       <bt:ShortStrings>

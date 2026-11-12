@@ -8,6 +8,10 @@
   let activeSheetId = null;
   let activationHandlerReady = false;
   let changeHandlerReady = false;
+  let taskpaneVisible = false;
+  let autoOpenedByDuplicate = false;
+  let currentDuplicateNotice = null;
+  let selectionCheckToken = 0;
   let storageKey = STORAGE_KEY;
 
   const toggleButton = () => document.getElementById("toggleButton");
@@ -54,19 +58,20 @@
 
   async function registerActivationHandler() {
     if (activationHandlerReady) return;
-    setSheetStatus("v1.5: comprobando si Excel admite la detección de cambios…");
+    setSheetStatus("v1.7: comprobando si Excel admite la detección de cambios…");
     if (!Office.context.requirements.isSetSupported("ExcelApi", "1.9")) {
       throw new Error("Esta sesión de Excel no informa compatibilidad con ExcelApi 1.9.");
     }
-    setSheetStatus("v1.5: esperando respuesta de Excel para conectar el detector…");
+    setSheetStatus("v1.7: esperando respuesta de Excel para conectar el detector…");
     await Excel.run(async (context) => {
       context.workbook.worksheets.onActivated.add(onWorksheetActivated);
       context.workbook.worksheets.onChanged.add(onWorksheetChanged);
+      context.workbook.worksheets.onSelectionChanged.add(onWorksheetSelectionChanged);
       await context.sync();
     });
     activationHandlerReady = true;
     changeHandlerReady = true;
-    setSheetStatus("v1.5: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
+    setSheetStatus("v1.7: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
   }
 
   async function onWorksheetActivated() {
@@ -97,13 +102,34 @@
         activeSheetId = sheet.id;
         setSheetStatus("Lista en " + sheet.name + ". Cambia una resolución en F para revisar antecedentes.", "ready");
       });
+      if (activeSheetId) await checkCurrentSelection();
     } catch (error) {
       setSheetStatus("No pude conectarme a la hoja activa: " + safeError(error), "error");
     }
   }
 
+  async function checkCurrentSelection() {
+    const selection = await Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getActiveWorksheet();
+      const range = context.workbook.getSelectedRange();
+      sheet.load("id");
+      range.load("address");
+      await context.sync();
+      return { worksheetId: sheet.id, address: range.address };
+    });
+    await onWorksheetSelectionChanged(selection);
+  }
+
   function parseStatusRows(address) {
     return parseColumnRows(address, "F");
+  }
+
+  function parseSelectedCellRow(address, targetColumn) {
+    const cellAddress = String(address || "").split("!").pop().replace(/'/g, "").replace(/\$/g, "");
+    const match = cellAddress.match(/^([A-Z]+)(\d+)$/i);
+    if (!match || match[1].toUpperCase() !== targetColumn.toUpperCase()) return 0;
+    const row = Number(match[2]);
+    return row >= 2 ? row : 0;
   }
 
   function parseColumnRows(address, targetColumn) {
@@ -126,8 +152,7 @@
   async function onWorksheetChanged(event) {
     if (!enabled || !changeHandlerReady || event.source !== "Local") return;
     const statusRows = parseStatusRows(event.address);
-    const idRows = parseColumnRows(event.address, "E");
-    if (!statusRows.length && !idRows.length) return;
+    if (!statusRows.length) return;
     setSheetStatus("Cambio local en " + event.address + "; identificando la hoja…");
     let sheetName = "";
     try {
@@ -140,14 +165,6 @@
       setSheetStatus("Detecté el cambio, pero esa hoja no tiene nombre mensual o encabezados compatibles.");
       return;
     }
-    for (const rowNumber of idRows) {
-      try {
-        const history = await findCedulaHistory(event.worksheetId, sheetName, rowNumber);
-        if (history) await openDuplicateNotice(history);
-      } catch (error) {
-        setSheetStatus("No pude revisar los antecedentes de la cédula: " + safeError(error), "error");
-      }
-    }
     for (const rowNumber of statusRows) {
       try {
         const alertData = await findConflicts(event.worksheetId, sheetName, rowNumber);
@@ -159,6 +176,33 @@
         }
       } catch (error) {
         setSheetStatus("No pude revisar la resolución: " + safeError(error), "error");
+      }
+    }
+  }
+
+  async function onWorksheetSelectionChanged(event) {
+    if (!enabled || !changeHandlerReady) return;
+    const token = ++selectionCheckToken;
+    const rowNumber = parseSelectedCellRow(event.address, "E");
+    if (!rowNumber) {
+      await clearDuplicateNotice(token);
+      return;
+    }
+    try {
+      const sheetName = await getMonthlySheetName(event.worksheetId);
+      if (token !== selectionCheckToken) return;
+      if (!sheetName) {
+        await clearDuplicateNotice(token);
+        return;
+      }
+      const history = await findCedulaHistory(event.worksheetId, sheetName, rowNumber);
+      if (token !== selectionCheckToken) return;
+      if (history) await showDuplicateNotice(history, token);
+      else await clearDuplicateNotice(token);
+    } catch (error) {
+      if (token === selectionCheckToken) {
+        setSheetStatus("No pude revisar la cédula seleccionada: " + safeError(error), "error");
+        await clearDuplicateNotice(token);
       }
     }
   }
@@ -219,8 +263,6 @@
       const noApplyCount = ownHistory.filter((status) => status === "NO APLICA").length;
       const ownCountText = "Tus antecedentes: " + applyCount + " APLICA · " + noApplyCount + " NO APLICA.";
 
-      sheet.getRange("E" + rowNumber).select();
-      await context.sync();
       return {
         sheet: sheetName,
         row: rowNumber,
@@ -231,40 +273,44 @@
     });
   }
 
-  function openDuplicateNotice(data) {
-    return new Promise((resolve) => {
-      const url = new URL("duplicate.html", window.location.href).href;
-      Office.context.ui.displayDialogAsync(url, { height: 28, width: 34, displayInIframe: true }, (result) => {
-        if (result.status !== Office.AsyncResultStatus.Succeeded) {
-          showInlineDuplicateNotice(data, resolve);
-          return;
-        }
-        const dialog = result.value;
-        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (message) => {
-          if (message.message === "READY") {
-            dialog.messageChild(JSON.stringify(data), { targetOrigin: window.location.origin });
-          } else if (message.message === "ACCEPT") {
-            dialog.close();
-            resolve();
-          }
-        });
-        dialog.addEventHandler(Office.EventType.DialogEventReceived, () => resolve());
-      });
-    });
-  }
-
-  function showInlineDuplicateNotice(data, resolve) {
+  function renderDuplicateNotice(data) {
     const box = document.getElementById("inlineDuplicateNotice");
     box.replaceChildren();
     const message = document.createElement("p");
     message.textContent = data.message + (data.detail ? " " + data.detail : "");
-    const accept = document.createElement("button");
-    accept.type = "button";
-    accept.className = "inline-accept";
-    accept.textContent = "Aceptar";
-    accept.addEventListener("click", () => { box.hidden = true; resolve(); });
-    box.append(message, accept);
+    box.append(message);
     box.hidden = false;
+  }
+
+  async function showDuplicateNotice(data, token) {
+    currentDuplicateNotice = data;
+    renderDuplicateNotice(data);
+    if (taskpaneVisible) return;
+    autoOpenedByDuplicate = true;
+    try {
+      await Office.addin.showAsTaskpane();
+      taskpaneVisible = true;
+      if (token !== selectionCheckToken || !currentDuplicateNotice) await clearDuplicateNotice(token);
+    } catch (error) {
+      autoOpenedByDuplicate = false;
+      setSheetStatus("No pude mostrar el aviso lateral: " + safeError(error), "error");
+    }
+  }
+
+  async function clearDuplicateNotice(token) {
+    if (token !== selectionCheckToken) return;
+    currentDuplicateNotice = null;
+    const box = document.getElementById("inlineDuplicateNotice");
+    box.hidden = true;
+    box.replaceChildren();
+    if (!autoOpenedByDuplicate) return;
+    autoOpenedByDuplicate = false;
+    if (taskpaneVisible) {
+      try {
+        await Office.addin.hide();
+        taskpaneVisible = false;
+      } catch (_) { /* Keep the hidden notice cleared if Excel cannot hide the pane. */ }
+    }
   }
 
   async function getMonthlySheetName(sheetId) {
@@ -428,6 +474,17 @@
       setSheetStatus("Este complemento funciona dentro de Excel Online.", "error");
       return;
     }
+    taskpaneVisible = document.visibilityState === "visible";
+    Office.addin.onVisibilityModeChanged((args) => {
+      taskpaneVisible = args.visibilityMode === Office.VisibilityMode.taskpane;
+      if (!taskpaneVisible) {
+        autoOpenedByDuplicate = false;
+        return;
+      }
+      if (currentDuplicateNotice) renderDuplicateNotice(currentDuplicateNotice);
+    }).catch((error) => {
+      setSheetStatus("No pude seguir la visibilidad del panel: " + safeError(error), "error");
+    });
     storageKey = workbookStorageKey();
     let savedEnabled = false;
     try { savedEnabled = window.localStorage.getItem(storageKey) === "1"; } catch (_) { savedEnabled = false; }
