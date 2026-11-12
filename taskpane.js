@@ -12,8 +12,9 @@
   let autoOpenedByDuplicate = false;
   let currentDuplicateNotice = null;
   let selectionCheckToken = 0;
-  const registeredSelectionSheets = new Set();
-  const selectionRegistrationPromises = new Map();
+  let selectionPollTimer = null;
+  let selectionPollInFlight = false;
+  let lastPolledSelectionKey = "";
   let storageKey = STORAGE_KEY;
 
   const toggleButton = () => document.getElementById("toggleButton");
@@ -39,6 +40,8 @@
     button.classList.toggle("on", value);
     if (!value) {
       activeSheetId = null;
+      stopSelectionPolling();
+      clearDuplicateNotice(++selectionCheckToken);
       setSheetStatus("Alertas pausadas.");
     } else {
       setSheetStatus("Conectando el detector de cambios de este libro…");
@@ -65,11 +68,11 @@
 
   async function registerActivationHandler() {
     if (activationHandlerReady) return;
-    setSheetStatus("v1.8: comprobando si Excel admite la detección de cambios…");
+    setSheetStatus("v1.9: comprobando si Excel admite la detección de cambios…");
     if (!Office.context.requirements.isSetSupported("ExcelApi", "1.9")) {
       throw new Error("Esta sesión de Excel no informa compatibilidad con ExcelApi 1.9.");
     }
-    setSheetStatus("v1.8: esperando respuesta de Excel para conectar el detector…");
+    setSheetStatus("v1.9: esperando respuesta de Excel para conectar el detector…");
     await Excel.run(async (context) => {
       context.workbook.worksheets.onActivated.add(onWorksheetActivated);
       context.workbook.worksheets.onChanged.add(onWorksheetChanged);
@@ -77,7 +80,7 @@
     });
     activationHandlerReady = true;
     changeHandlerReady = true;
-    setSheetStatus("v1.8: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
+    setSheetStatus("v1.9: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
   }
 
   async function onWorksheetActivated() {
@@ -113,11 +116,14 @@
         setSheetStatus("Lista en " + sheet.name + ". Cambia una resolución en F para revisar antecedentes.", "ready");
       });
       if (monthlySheet) {
-        await registerSheetSelectionHandler(monthlySheet.id, monthlySheet.name);
-        if (activeSheetId === monthlySheet.id && registeredSelectionSheets.has(monthlySheet.id)) {
-          checkCurrentSelection(monthlySheet.id).catch((error) => setSelectionStatus("No pude revisar la celda seleccionada: " + safeError(error), "error"));
+        lastPolledSelectionKey = "";
+        if (activeSheetId === monthlySheet.id) {
+          await checkCurrentSelection(monthlySheet.id);
+          startSelectionPolling();
+          setSelectionStatus("Revisión de E activa: comprobando la celda seleccionada cada segundo.", "ready");
         }
       } else {
+        stopSelectionPolling();
         await clearDuplicateNotice(++selectionCheckToken);
       }
     } catch (error) {
@@ -125,43 +131,39 @@
     }
   }
 
-  async function registerSheetSelectionHandler(sheetId, sheetName) {
-    if (registeredSelectionSheets.has(sheetId)) {
-      setSelectionStatus("Aviso de cédulas listo en " + sheetName + ".", "ready");
-      return;
-    }
-    if (selectionRegistrationPromises.has(sheetId)) {
-      const pending = selectionRegistrationPromises.get(sheetId);
-      const completed = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve(false), 3000))]);
-      if (!completed) setSelectionStatus("El detector de F está conectado; el aviso de selección en E sigue conectando…");
-      else if (activeSheetId === sheetId) checkCurrentSelection(sheetId).catch((error) => setSelectionStatus("No pude revisar la celda seleccionada: " + safeError(error), "error"));
-      return;
-    }
+  function startSelectionPolling() {
+    if (selectionPollTimer !== null) return;
+    selectionPollTimer = window.setInterval(pollSelectedCell, 1000);
+    pollSelectedCell();
+  }
 
-    setSelectionStatus("Conectando el aviso de selección en E para " + sheetName + "…");
-    const registration = Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getItem(sheetId);
-      sheet.onSelectionChanged.add(onWorksheetSelectionChanged);
-      await context.sync();
-    }).then(() => {
-      registeredSelectionSheets.add(sheetId);
-      setSelectionStatus("Aviso de cédulas listo en " + sheetName + ".", "ready");
-      return true;
-    }).catch((error) => {
-      setSelectionStatus("La alerta de F sigue lista; no pude conectar la selección de E: " + safeError(error), "error");
-      return false;
-    }).finally(() => {
-      selectionRegistrationPromises.delete(sheetId);
-    });
-    selectionRegistrationPromises.set(sheetId, registration);
-    const completed = await Promise.race([registration, new Promise((resolve) => setTimeout(() => resolve(false), 3000))]);
-    if (!completed && activeSheetId === sheetId) {
-      setSelectionStatus("El detector de F está conectado; el aviso de selección en E sigue conectando…");
-      registration.then((connected) => {
-        if (connected && activeSheetId === sheetId) {
-          checkCurrentSelection(sheetId).catch((error) => setSelectionStatus("No pude revisar la celda seleccionada: " + safeError(error), "error"));
-        }
+  function stopSelectionPolling() {
+    if (selectionPollTimer !== null) window.clearInterval(selectionPollTimer);
+    selectionPollTimer = null;
+    lastPolledSelectionKey = "";
+  }
+
+  async function pollSelectedCell() {
+    if (!enabled || !changeHandlerReady || !activeSheetId || selectionPollInFlight) return;
+    selectionPollInFlight = true;
+    try {
+      const selection = await Excel.run(async (context) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet();
+        const range = context.workbook.getSelectedRange();
+        sheet.load("id");
+        range.load("address");
+        await context.sync();
+        return { worksheetId: sheet.id, address: range.address };
       });
+      if (selection.worksheetId !== activeSheetId) return;
+      const key = selection.worksheetId + "|" + selection.address;
+      if (key === lastPolledSelectionKey) return;
+      lastPolledSelectionKey = key;
+      await onWorksheetSelectionChanged(selection);
+    } catch (error) {
+      setSelectionStatus("No pude revisar la selección de E: " + safeError(error), "error");
+    } finally {
+      selectionPollInFlight = false;
     }
   }
 
@@ -175,6 +177,7 @@
       return { worksheetId: sheet.id, address: range.address };
     });
     if (selection.worksheetId !== sheetId || activeSheetId !== sheetId) return;
+    lastPolledSelectionKey = selection.worksheetId + "|" + selection.address;
     await onWorksheetSelectionChanged(selection);
   }
 
