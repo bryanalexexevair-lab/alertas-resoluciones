@@ -8,9 +8,9 @@
   let activeSheetId = null;
   let activationHandlerReady = false;
   let changeHandlerReady = false;
-  let taskpaneVisible = false;
-  let autoOpenedByDuplicate = false;
   let currentDuplicateNotice = null;
+  let duplicateDialog = null;
+  let duplicateDialogReady = false;
   let selectionCheckToken = 0;
   let selectionPollTimer = null;
   let selectionPollInFlight = false;
@@ -68,11 +68,11 @@
 
   async function registerActivationHandler() {
     if (activationHandlerReady) return;
-    setSheetStatus("v1.9: comprobando si Excel admite la detección de cambios…");
-    if (!Office.context.requirements.isSetSupported("ExcelApi", "1.9")) {
-      throw new Error("Esta sesión de Excel no informa compatibilidad con ExcelApi 1.9.");
+    setSheetStatus("v1.10: comprobando si Excel admite la detección de cambios…");
+    if (!Office.context.requirements.isSetSupported("ExcelApi", "1.10")) {
+      throw new Error("Esta sesión de Excel no informa compatibilidad con ExcelApi 1.10.");
     }
-    setSheetStatus("v1.9: esperando respuesta de Excel para conectar el detector…");
+    setSheetStatus("v1.10: esperando respuesta de Excel para conectar el detector…");
     await Excel.run(async (context) => {
       context.workbook.worksheets.onActivated.add(onWorksheetActivated);
       context.workbook.worksheets.onChanged.add(onWorksheetChanged);
@@ -80,7 +80,7 @@
     });
     activationHandlerReady = true;
     changeHandlerReady = true;
-    setSheetStatus("v1.9: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
+    setSheetStatus("v1.10: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
   }
 
   async function onWorksheetActivated() {
@@ -345,17 +345,50 @@
 
   async function showDuplicateNotice(data, token) {
     currentDuplicateNotice = data;
-    renderDuplicateNotice(data);
-    if (taskpaneVisible) return;
-    autoOpenedByDuplicate = true;
-    try {
-      await Office.addin.showAsTaskpane();
-      taskpaneVisible = true;
-      if (token !== selectionCheckToken || !currentDuplicateNotice) await clearDuplicateNotice(token);
-    } catch (error) {
-      autoOpenedByDuplicate = false;
-      setSheetStatus("No pude mostrar el aviso lateral: " + safeError(error), "error");
+    if (duplicateDialog) {
+      if (duplicateDialogReady) {
+        try {
+          duplicateDialog.messageChild(JSON.stringify(data), { targetOrigin: window.location.origin });
+          return;
+        } catch (_) {
+          duplicateDialog = null;
+          duplicateDialogReady = false;
+        }
+      } else {
+        return;
+      }
     }
+
+    const url = new URL("duplicate.html", window.location.href).href;
+    Office.context.ui.displayDialogAsync(url, { height: 25, width: 28, displayInIframe: true }, (result) => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        if (token === selectionCheckToken && currentDuplicateNotice) {
+          renderDuplicateNotice(data);
+          setSelectionStatus("No pude abrir la ventanita flotante: " + safeError(result.error), "error");
+        }
+        return;
+      }
+      const openedDialog = result.value;
+      duplicateDialog = openedDialog;
+      duplicateDialogReady = false;
+      openedDialog.addEventHandler(Office.EventType.DialogMessageReceived, (event) => {
+        if (event.message === "READY") {
+          duplicateDialogReady = true;
+          if (token !== selectionCheckToken || !currentDuplicateNotice) {
+            openedDialog.close();
+            return;
+          }
+          openedDialog.messageChild(JSON.stringify(currentDuplicateNotice), { targetOrigin: window.location.origin });
+        }
+      });
+      openedDialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+        if (duplicateDialog === openedDialog) {
+          duplicateDialog = null;
+          duplicateDialogReady = false;
+        }
+      });
+      if (token !== selectionCheckToken || !currentDuplicateNotice) openedDialog.close();
+    });
   }
 
   async function clearDuplicateNotice(token) {
@@ -364,13 +397,13 @@
     const box = document.getElementById("inlineDuplicateNotice");
     box.hidden = true;
     box.replaceChildren();
-    if (!autoOpenedByDuplicate) return;
-    autoOpenedByDuplicate = false;
-    if (taskpaneVisible) {
+    if (duplicateDialog) {
+      const closingDialog = duplicateDialog;
+      duplicateDialog = null;
+      duplicateDialogReady = false;
       try {
-        await Office.addin.hide();
-        taskpaneVisible = false;
-      } catch (_) { /* Keep the hidden notice cleared if Excel cannot hide the pane. */ }
+        closingDialog.close();
+      } catch (_) { /* The notice is already cleared if Excel closed the dialog. */ }
     }
   }
 
@@ -535,17 +568,6 @@
       setSheetStatus("Este complemento funciona dentro de Excel Online.", "error");
       return;
     }
-    taskpaneVisible = document.visibilityState === "visible";
-    Office.addin.onVisibilityModeChanged((args) => {
-      taskpaneVisible = args.visibilityMode === Office.VisibilityMode.taskpane;
-      if (!taskpaneVisible) {
-        autoOpenedByDuplicate = false;
-        return;
-      }
-      if (currentDuplicateNotice) renderDuplicateNotice(currentDuplicateNotice);
-    }).catch((error) => {
-      setSheetStatus("No pude seguir la visibilidad del panel: " + safeError(error), "error");
-    });
     storageKey = workbookStorageKey();
     let savedEnabled = false;
     try { savedEnabled = window.localStorage.getItem(storageKey) === "1"; } catch (_) { savedEnabled = false; }

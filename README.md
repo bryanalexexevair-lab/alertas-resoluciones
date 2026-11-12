@@ -1,12 +1,12 @@
 # Alerta personal de resoluciones para Excel Online
 
-Este paquete actualizado (versión 1.9) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
+Este paquete actualizado (versión 1.10) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
 
 ## Funcionamiento
 
 - Escucha los cambios del libro y primero comprueba el nombre de la hoja modificada. Solo procesa hojas con nombre de mes y año en español y encabezados esperados en B1, E1, F1 y G1.
 - Al cambiar una celda de F, compara la cédula de E con el resto de las filas de esa misma hoja.
-- Al seleccionar una celda de cédula repetida en E, abre el panel lateral automáticamente y muestra un recuadro compacto sin botón. Al seleccionar otra celda, el recuadro desaparece y el panel se oculta si se abrió automáticamente por este aviso. Si hay antecedentes de otros usuarios, indica que existen antecedentes de otros usuarios y tuyos; si solo los tuyos, muestra el conteo de `APLICA` y `NO APLICA`.
+- Al seleccionar una celda de cédula repetida en E, muestra una ventanita flotante en Excel Online, sin botón Aceptar. Al cambiar a otra celda, se cierra automáticamente. Si hay antecedentes de otros usuarios, indica que existen antecedentes de otros usuarios y tuyos; si solo los tuyos, muestra el conteo de `APLICA` y `NO APLICA`.
 - Solo alerta cuando encuentra la misma cédula con la resolución opuesta (`APLICA` frente a `NO APLICA`) en otro usuario. No incluye las propias filas de quien está usando el complemento.
 - Muestra el nombre de B, la resolución y el motivo de G de cada antecedente contradictorio. Si no hay contradicción, no abre una ventana.
 - En una contradicción de F, el botón **Aceptar** cierra la ventana. El interruptor del panel activa o desactiva las alertas.
@@ -29,7 +29,7 @@ GitHub Pages aloja el código estático del panel y de la ventana. El manifiesto
 
 - La primera vez en cada libro, abre el panel desde **Mis alertas** y activa las alertas. El complemento configura un runtime compartido para que siga escuchando cambios aunque cierres el panel y vuelva a iniciarse cuando abras ese libro. Excel Online no conserva los manejadores después de cerrar o recargar el complemento; al abrir el libro de nuevo, el runtime se inicia y registra otra vez.
 - La alerta de resolución en F mantiene su ventana y flujo actuales. La revisión de E funciona de forma independiente y consulta la selección aproximadamente una vez por segundo mientras las alertas estén activadas.
-- La tarjeta de E no escribe comentarios ni validaciones en el libro. Requiere que el complemento esté activado en segundo plano para que pueda responder cuando el panel está oculto.
+- La ventanita de E no escribe comentarios ni validaciones en el libro. Es un diálogo flotante no modal y requiere que el complemento esté activado en segundo plano para responder cuando el panel está oculto.
 - Las cédulas se comparan sin espacios, guiones ni signos de puntuación, y sin distinguir mayúsculas/minúsculas. Las resoluciones se reconocen tras quitar espacios y normalizar mayúsculas.
 - Se espera encabezado en fila 1 y datos desde fila 2, igual que en la hoja revisada.
 - El evento de cambios puede abarcar cualquier hoja, pero el complemento solo consulta su nombre. Solo lee encabezados y datos de B, E, F y G en hojas mensuales reconocidas; ignora las demás hojas.

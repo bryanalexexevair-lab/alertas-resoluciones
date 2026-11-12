@@ -1,8 +1,8 @@
-:root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; color: #172b4d; background: #fff; }
+:root { color-scheme: light; font-family: "Segoe UI", Arial, sans-serif; color: #172b4d; background: transparent; }
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 280px; }
-.notice { padding: 15px 18px 12px; }
-#message { margin: 0; font-size: 13px; line-height: 1.45; }
-.detail { margin: 6px 0 0; color: #61758e; font-size: 11px; line-height: 1.4; }
-button { display: block; margin: 12px 0 0 auto; border: 0; border-radius: 5px; padding: 5px 13px; color: #fff; background: #1769aa; cursor: pointer; font: 600 11px "Segoe UI", Arial, sans-serif; }
-button:disabled { opacity: .55; cursor: wait; }
+html, body { min-width: 250px; min-height: 150px; margin: 0; background: transparent; }
+body { display: grid; place-items: center; padding: 12px; }
+.notice { width: 100%; padding: 15px 18px; border: 1px solid #b8c9e3; border-radius: 10px; background: #fff; box-shadow: 0 8px 26px rgba(20, 43, 77, .2); }
+.marker { display: grid; width: 22px; height: 22px; margin-bottom: 9px; place-items: center; border-radius: 50%; color: #fff; background: #1769aa; font-size: 14px; font-weight: 700; }
+#message { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.45; }
+.detail { margin: 7px 0 0; color: #61758e; font-size: 11px; line-height: 1.4; }
