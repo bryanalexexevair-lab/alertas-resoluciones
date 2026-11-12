@@ -1,6 +1,6 @@
 # Alerta personal de resoluciones para Excel Online
 
-Este paquete actualizado (versión 1.7) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
+Este paquete actualizado (versión 1.8) contiene el complemento web para Excel Online. Lee únicamente las columnas B, E, F y G de las hojas cuyo nombre corresponda a un mes y año en español. No escribe en el libro ni envía su contenido a GitHub.
 
 ## Funcionamiento
 
@@ -9,9 +9,10 @@ Este paquete actualizado (versión 1.7) contiene el complemento web para Excel O
 - Al seleccionar una celda de cédula repetida en E, abre el panel lateral automáticamente y muestra un recuadro compacto sin botón. Al seleccionar otra celda, el recuadro desaparece y el panel se oculta si se abrió automáticamente por este aviso. Si hay antecedentes de otros usuarios, indica que existen antecedentes de otros usuarios y tuyos; si solo los tuyos, muestra el conteo de `APLICA` y `NO APLICA`.
 - Solo alerta cuando encuentra la misma cédula con la resolución opuesta (`APLICA` frente a `NO APLICA`) en otro usuario. No incluye las propias filas de quien está usando el complemento.
 - Muestra el nombre de B, la resolución y el motivo de G de cada antecedente contradictorio. Si no hay contradicción, no abre una ventana.
-- El botón **Aceptar** cierra la ventana. El interruptor del panel activa o desactiva las alertas.
+- En una contradicción de F, el botón **Aceptar** cierra la ventana. El interruptor del panel activa o desactiva las alertas.
 - Solo muestra alertas cuando la persona que tiene el complemento cambia F. Las resoluciones y motivos anteriores de otros usuarios sí se usan como antecedentes. El estado de activación se guarda en el almacenamiento local del navegador, no en el libro.
 - El complemento aparece en una pestaña propia llamada **Mis alertas** en la cinta superior de Excel.
+- El panel muestra por separado el estado del detector de F y del aviso de selección en E. La conexión de E no bloquea la alerta de F; si Excel tarda en habilitarla, el panel lo indica y vuelve a revisar la celda al conectarse.
 - El panel muestra el resultado de cada cambio local en F: si lo detectó, qué hoja y fila revisó, y si encontró una resolución opuesta. Esto ayuda a distinguir entre un detector sin conexión y una cédula sin contradicción.
 
 ## Publicar en GitHub Pages
@@ -27,7 +28,7 @@ GitHub Pages aloja el código estático del panel y de la ventana. El manifiesto
 ## Alcance y límites de esta versión
 
 - La primera vez en cada libro, abre el panel desde **Mis alertas** y activa las alertas. El complemento configura un runtime compartido para que siga escuchando cambios aunque cierres el panel y vuelva a iniciarse cuando abras ese libro. Excel Online no conserva los manejadores después de cerrar o recargar el complemento; al abrir el libro de nuevo, el runtime se inicia y registra otra vez.
-- La alerta de resolución en F mantiene su ventana y flujo actuales. La revisión de E solo responde a una selección de celda en E; al salir de E desaparece su tarjeta y se oculta el panel que se abrió automáticamente.
+- La alerta de resolución en F mantiene su ventana y flujo actuales. La revisión de E usa un evento de selección separado por hoja mensual; si ese evento no se conecta, el panel informa ese estado y la alerta de F sigue activa.
 - La tarjeta de E no escribe comentarios ni validaciones en el libro. Requiere que el complemento esté activado en segundo plano para que pueda responder cuando el panel está oculto.
 - Las cédulas se comparan sin espacios, guiones ni signos de puntuación, y sin distinguir mayúsculas/minúsculas. Las resoluciones se reconocen tras quitar espacios y normalizar mayúsculas.
 - Se espera encabezado en fila 1 y datos desde fila 2, igual que en la hoja revisada.

@@ -12,6 +12,8 @@
   let autoOpenedByDuplicate = false;
   let currentDuplicateNotice = null;
   let selectionCheckToken = 0;
+  const registeredSelectionSheets = new Set();
+  const selectionRegistrationPromises = new Map();
   let storageKey = STORAGE_KEY;
 
   const toggleButton = () => document.getElementById("toggleButton");
@@ -19,6 +21,11 @@
     const el = document.getElementById("sheetStatus");
     el.textContent = message;
     el.className = "sheet-status" + (state ? " " + state : "");
+  };
+  const setSelectionStatus = (message, state) => {
+    const el = document.getElementById("selectionStatus");
+    el.textContent = message;
+    el.className = "sheet-status selection-status" + (state ? " " + state : "");
   };
 
   function setEnabled(value) {
@@ -58,20 +65,19 @@
 
   async function registerActivationHandler() {
     if (activationHandlerReady) return;
-    setSheetStatus("v1.7: comprobando si Excel admite la detección de cambios…");
+    setSheetStatus("v1.8: comprobando si Excel admite la detección de cambios…");
     if (!Office.context.requirements.isSetSupported("ExcelApi", "1.9")) {
       throw new Error("Esta sesión de Excel no informa compatibilidad con ExcelApi 1.9.");
     }
-    setSheetStatus("v1.7: esperando respuesta de Excel para conectar el detector…");
+    setSheetStatus("v1.8: esperando respuesta de Excel para conectar el detector…");
     await Excel.run(async (context) => {
       context.workbook.worksheets.onActivated.add(onWorksheetActivated);
       context.workbook.worksheets.onChanged.add(onWorksheetChanged);
-      context.workbook.worksheets.onSelectionChanged.add(onWorksheetSelectionChanged);
       await context.sync();
     });
     activationHandlerReady = true;
     changeHandlerReady = true;
-    setSheetStatus("v1.7: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
+    setSheetStatus("v1.8: Excel respondió y el detector quedó conectado; identificando la hoja…", "ready");
   }
 
   async function onWorksheetActivated() {
@@ -80,6 +86,7 @@
 
   async function bindActiveMonthlySheet() {
     if (!enabled) return;
+    let monthlySheet = null;
     try {
       await Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getActiveWorksheet();
@@ -88,6 +95,7 @@
         if (!isMonthlyName(sheet.name)) {
           activeSheetId = null;
           setSheetStatus("Abre la hoja del mes, por ejemplo NOVIEMBRE 2026.");
+          setSelectionStatus("El aviso de cédulas se activa en hojas mensuales.");
           return;
         }
         const headerRanges = ["B1", "E1", "F1", "G1"].map((address) => sheet.getRange(address));
@@ -97,18 +105,67 @@
         if (!isExpectedHeaders(headerValues)) {
           activeSheetId = null;
           setSheetStatus("La hoja tiene nombre mensual, pero sus encabezados no coinciden con B, E, F y G.", "error");
+          setSelectionStatus("No se pudo preparar el aviso de cédulas: revisa los encabezados.", "error");
           return;
         }
         activeSheetId = sheet.id;
+        monthlySheet = { id: sheet.id, name: sheet.name };
         setSheetStatus("Lista en " + sheet.name + ". Cambia una resolución en F para revisar antecedentes.", "ready");
       });
-      if (activeSheetId) await checkCurrentSelection();
+      if (monthlySheet) {
+        await registerSheetSelectionHandler(monthlySheet.id, monthlySheet.name);
+        if (activeSheetId === monthlySheet.id && registeredSelectionSheets.has(monthlySheet.id)) {
+          checkCurrentSelection(monthlySheet.id).catch((error) => setSelectionStatus("No pude revisar la celda seleccionada: " + safeError(error), "error"));
+        }
+      } else {
+        await clearDuplicateNotice(++selectionCheckToken);
+      }
     } catch (error) {
       setSheetStatus("No pude conectarme a la hoja activa: " + safeError(error), "error");
     }
   }
 
-  async function checkCurrentSelection() {
+  async function registerSheetSelectionHandler(sheetId, sheetName) {
+    if (registeredSelectionSheets.has(sheetId)) {
+      setSelectionStatus("Aviso de cédulas listo en " + sheetName + ".", "ready");
+      return;
+    }
+    if (selectionRegistrationPromises.has(sheetId)) {
+      const pending = selectionRegistrationPromises.get(sheetId);
+      const completed = await Promise.race([pending, new Promise((resolve) => setTimeout(() => resolve(false), 3000))]);
+      if (!completed) setSelectionStatus("El detector de F está conectado; el aviso de selección en E sigue conectando…");
+      else if (activeSheetId === sheetId) checkCurrentSelection(sheetId).catch((error) => setSelectionStatus("No pude revisar la celda seleccionada: " + safeError(error), "error"));
+      return;
+    }
+
+    setSelectionStatus("Conectando el aviso de selección en E para " + sheetName + "…");
+    const registration = Excel.run(async (context) => {
+      const sheet = context.workbook.worksheets.getItem(sheetId);
+      sheet.onSelectionChanged.add(onWorksheetSelectionChanged);
+      await context.sync();
+    }).then(() => {
+      registeredSelectionSheets.add(sheetId);
+      setSelectionStatus("Aviso de cédulas listo en " + sheetName + ".", "ready");
+      return true;
+    }).catch((error) => {
+      setSelectionStatus("La alerta de F sigue lista; no pude conectar la selección de E: " + safeError(error), "error");
+      return false;
+    }).finally(() => {
+      selectionRegistrationPromises.delete(sheetId);
+    });
+    selectionRegistrationPromises.set(sheetId, registration);
+    const completed = await Promise.race([registration, new Promise((resolve) => setTimeout(() => resolve(false), 3000))]);
+    if (!completed && activeSheetId === sheetId) {
+      setSelectionStatus("El detector de F está conectado; el aviso de selección en E sigue conectando…");
+      registration.then((connected) => {
+        if (connected && activeSheetId === sheetId) {
+          checkCurrentSelection(sheetId).catch((error) => setSelectionStatus("No pude revisar la celda seleccionada: " + safeError(error), "error"));
+        }
+      });
+    }
+  }
+
+  async function checkCurrentSelection(sheetId) {
     const selection = await Excel.run(async (context) => {
       const sheet = context.workbook.worksheets.getActiveWorksheet();
       const range = context.workbook.getSelectedRange();
@@ -117,6 +174,7 @@
       await context.sync();
       return { worksheetId: sheet.id, address: range.address };
     });
+    if (selection.worksheetId !== sheetId || activeSheetId !== sheetId) return;
     await onWorksheetSelectionChanged(selection);
   }
 
